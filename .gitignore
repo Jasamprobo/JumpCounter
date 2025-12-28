@@ -1,0 +1,15 @@
+# WoW Addon files to ignore
+*.bak
+*.tmp
+*.old
+*.log
+.DS_Store
+*.luac
+Thumbs.db
+*.swp
+*.swo
+*~
+/.vscode/
+/.idea/
+/__pycache__/
+*.pyc

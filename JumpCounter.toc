@@ -1,0 +1,8 @@
+## Interface: 11307
+## Title: JumpCounter
+## Notes: Counts player jumps in WoW Classic
+## Author: Jasamprobo
+## Version: 1.0.0
+## SavedVariables: JumpCounterDB
+
+JumpCounter.lua
