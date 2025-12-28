@@ -3,6 +3,8 @@
 ------------------------------------------------
 JumpCounterDB = JumpCounterDB or { 
     count = 0,
+    sessionCount = 0,
+    lastJumpTime = nil,
     point = "CENTER",
     x = 0,
     y = 200,
@@ -38,23 +40,70 @@ display:SetBackdropColor(0, 0, 0, 0.7)
 display:EnableMouse(true)
 display:SetMovable(true)
 
+-- Omogući pomicanje cijelog prozora
+display:RegisterForDrag("LeftButton")
+display:SetScript("OnDragStart", function(self)
+    self:StartMoving()
+end)
+
+display:SetScript("OnDragStop", function(self)
+    self:StopMovingOrSizing()
+    -- Spremi novu poziciju
+    local point, _, relativePoint, xOfs, yOfs = self:GetPoint(1)
+    JumpCounterDB.point = point
+    JumpCounterDB.x = xOfs
+    JumpCounterDB.y = yOfs
+end)
+
+-- Tooltip za pomicanje
+display:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("JumpCounter")
+    GameTooltip:AddLine("Lijevi klik i vuci za pomicanje", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Donji desni kut za resize", 0.8, 0.8, 0.8)
+    GameTooltip:Show()
+end)
+
+display:SetScript("OnLeave", function(self)
+    GameTooltip:Hide()
+end)
+
 ------------------------------------------------
--- TEXT (definiraj ovo PRIJE resize dijela!)
+-- TEXT
 ------------------------------------------------
 local text = display:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 text:SetPoint("CENTER")
 
 local function UpdateText()
-    text:SetText("JumpCounter: " .. JumpCounterDB.count)
+    local total = JumpCounterDB.count
+    local session = JumpCounterDB.sessionCount or 0
     
-    -- Prilagodi veličinu fonta prema visini displaya
-    local height = display:GetHeight()
+    -- Izračunaj rate samo ako ima session podataka
+    local rateText = ""
+    if session > 10 then  -- Bar 10 skokova za precizniji rate
+        rateText = "Rate: " .. math.floor(session / 5) .. "/min"
+    end
+    
+    -- Prilagodi tekst prema veličini prozora
+    local width, height = display:GetSize()
+    
     if height < 50 then
+        -- Mala visina - samo total
         text:SetFontObject("GameFontNormal")
+        text:SetText("Jumps: " .. total)
     elseif height < 70 then
+        -- Srednja visina - total + session
         text:SetFontObject("GameFontNormalLarge")
+        text:SetText(string.format("Total: %d\nSess: %d", total, session))
     else
+        -- Velika visina - sve informacije
         text:SetFontObject("GameFontNormalHuge")
+        if rateText ~= "" then
+            text:SetText(string.format("Total: %d\nSession: %d\n%s", 
+                total, session, rateText))
+        else
+            text:SetText(string.format("Total: %d\nSession: %d", total, session))
+        end
     end
     
     -- Centriraj tekst
@@ -62,34 +111,7 @@ local function UpdateText()
     text:SetPoint("CENTER")
 end
 
--- Kreiraj poseban "drag handle" na gornjem dijelu
-local dragHandle = CreateFrame("Frame", nil, display)
-dragHandle:SetHeight(20)
-dragHandle:SetPoint("TOPLEFT", 0, 0)
-dragHandle:SetPoint("TOPRIGHT", 0, 0)
-dragHandle:EnableMouse(true)
-dragHandle:RegisterForDrag("LeftButton")
-
--- Tekst za pokazivanje da se može vući
-local dragText = dragHandle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-dragText:SetPoint("CENTER")
-dragText:SetText("")
-dragText:SetTextColor(0.8, 0.8, 0.8, 0.8)
-
-dragHandle:SetScript("OnDragStart", function(self)
-    display:StartMoving()
-end)
-
-dragHandle:SetScript("OnDragStop", function(self)
-    display:StopMovingOrSizing()
-    -- Spremi novu poziciju
-    local point, _, relativePoint, xOfs, yOfs = display:GetPoint(1)
-    JumpCounterDB.point = point
-    JumpCounterDB.x = xOfs
-    JumpCounterDB.y = yOfs
-end)
-
--- MANUAL RESIZE ZA CLASSIC (bez SetMinResize/SetMaxResize)
+-- MANUAL RESIZE ZA CLASSIC
 local isResizing = false
 local minWidth, minHeight = 100, 30
 local maxWidth, maxHeight = 400, 100
@@ -107,17 +129,15 @@ resizeButton:SetScript("OnMouseDown", function(self, button)
         isResizing = true
         display.startWidth, display.startHeight = display:GetSize()
         display.startX, display.startY = GetCursorPosition()
-        display:StartMoving() -- Koristimo StartMoving kao workaround za resize
     end
 end)
 
 resizeButton:SetScript("OnMouseUp", function(self, button)
     if button == "LeftButton" and isResizing then
         isResizing = false
-        display:StopMovingOrSizing()
         -- Spremi novu veličinu
         JumpCounterDB.width, JumpCounterDB.height = display:GetSize()
-        UpdateText() -- Update teksta nakon resize-a
+        UpdateText()
     end
 end)
 
@@ -128,9 +148,8 @@ resizeButton:SetScript("OnUpdate", function(self)
         local scale = UIParent:GetEffectiveScale()
         
         local deltaX = (currentX - display.startX) / scale
-        local deltaY = (display.startY - currentY) / scale  -- Obrnuto za Y os
+        local deltaY = (display.startY - currentY) / scale
         
-        -- Izračunaj novu veličinu
         local newWidth = display.startWidth + deltaX
         local newHeight = display.startHeight + deltaY
         
@@ -138,34 +157,38 @@ resizeButton:SetScript("OnUpdate", function(self)
         newWidth = math.max(minWidth, math.min(maxWidth, newWidth))
         newHeight = math.max(minHeight, math.min(maxHeight, newHeight))
         
-        -- Postavi novu veličinu
         display:SetSize(newWidth, newHeight)
-        
-        -- Update teksta (samo centriranje, bez promjene teksta)
         text:ClearAllPoints()
         text:SetPoint("CENTER")
     end
 end)
 
--- Spriječi resize ako klikamo negdje drugdje
-display:SetScript("OnMouseDown", function(self, button)
-    if button == "LeftButton" and not isResizing then
-        -- Spriječi da se resize aktivira na cijelom frameu
-        return
-    end
-end)
-
 ------------------------------------------------
--- SKOK DETEKCIJA (Classic-safe)
+-- SKOK DETEKCIJA I SESSION TRACKING
 ------------------------------------------------
 local wasFalling = false
+local SESSION_TIMEOUT = 300 -- 5 minuta bez skokova = nova session
 
 frame:SetScript("OnUpdate", function()
     local isFalling = IsFalling()
 
-    -- trenutak kad započne skok
     if isFalling and not wasFalling then
+        local now = GetTime()
+        
+        -- Provjeri treba li nova session
+        if not JumpCounterDB.lastJumpTime or 
+           (now - JumpCounterDB.lastJumpTime) > SESSION_TIMEOUT then
+            -- Resetiraj session count
+            JumpCounterDB.sessionCount = 1
+        else
+            -- Povećaj session count
+            JumpCounterDB.sessionCount = (JumpCounterDB.sessionCount or 0) + 1
+        end
+        
+        -- Povećaj total count
         JumpCounterDB.count = JumpCounterDB.count + 1
+        JumpCounterDB.lastJumpTime = now
+        
         UpdateText()
     end
 
@@ -176,11 +199,22 @@ end)
 -- INIT
 ------------------------------------------------
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
 frame:SetScript("OnEvent", function(self, event)
-    if event == "PLAYER_LOGIN" then
-        if not JumpCounterDB.count then
-            JumpCounterDB.count = 0
+    if event == "PLAYER_LOGIN" or event == "PLAYER_ENTERING_WORLD" then
+        -- Inicijaliziraj ako ne postoje
+        if not JumpCounterDB.count then JumpCounterDB.count = 0 end
+        if not JumpCounterDB.sessionCount then JumpCounterDB.sessionCount = 0 end
+        
+        -- Provjeri je li prošlo previše vremena od zadnjeg skoka
+        local now = GetTime()
+        if JumpCounterDB.lastJumpTime and 
+           (now - JumpCounterDB.lastJumpTime) > SESSION_TIMEOUT then
+            -- Resetiraj session
+            JumpCounterDB.sessionCount = 0
         end
+        
         UpdateText()
     end
 end)
@@ -196,15 +230,18 @@ SlashCmdList["JUMPCOUNTER"] = function(msg)
 
     if msg == "reset" then
         JumpCounterDB.count = 0
+        JumpCounterDB.sessionCount = 0
         UpdateText()
         print("|cff00ff00JumpCounter:|r resetirano.")
+    elseif msg == "resetsession" then
+        JumpCounterDB.sessionCount = 0
+        UpdateText()
+        print("|cff00ff00JumpCounter:|r session resetirana.")
     elseif msg == "resetpos" then
-        -- Resetiraj poziciju na default
         display:ClearAllPoints()
         display:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
         display:SetSize(200, 40)
         
-        -- Update bazu podataka
         JumpCounterDB.point = "CENTER"
         JumpCounterDB.x = 0
         JumpCounterDB.y = 200
@@ -213,31 +250,34 @@ SlashCmdList["JUMPCOUNTER"] = function(msg)
         
         UpdateText()
         print("|cff00ff00JumpCounter:|r pozicija resetirana.")
-    elseif msg == "lock" then
-        -- Zaključaj poziciju
-        display:SetMovable(false)
-        dragText:Hide()
-        print("|cff00ff00JumpCounter:|r zaključano.")
-    elseif msg == "unlock" then
-        -- Otključaj poziciju
-        display:SetMovable(true)
-        dragText:Show()
-        print("|cff00ff00JumpCounter:|r otključano.")
+    elseif msg == "stats" or msg == "" then
+        local rate = "N/A"
+        if JumpCounterDB.sessionCount > 10 then
+            rate = math.floor(JumpCounterDB.sessionCount / 5) .. "/min"
+        end
+        
+        print("|cff00ff00=== JumpCounter Stats ===")
+        print("|cffffcc00Total Jumps:|r " .. JumpCounterDB.count)
+        print("|cffffcc00Session Jumps:|r " .. JumpCounterDB.sessionCount)
+        print("|cffffcc00Jump Rate:|r " .. rate)
+        print("|cffffcc00Last Jump:|r " .. 
+              (JumpCounterDB.lastJumpTime and "Recently" or "Never"))
+    elseif msg == "help" then
+        print("|cff00ff00JumpCounter Commands:")
+        print("|cffffcc00/jc|r - Show stats")
+        print("|cffffcc00/jc reset|r - Reset total counter")
+        print("|cffffcc00/jc resetsession|r - Reset session only")
+        print("|cffffcc00/jc resetpos|r - Reset window position")
+        print("|cffffcc00/jc stats|r - Detailed statistics")
     else
-        print("|cff00ff00JumpCounter:|r " .. JumpCounterDB.count .. " skokova")
-        print("Koristi:")
-        print("|cffffcc00/jc reset|r - Resetiraj brojač")
-        print("|cffffcc00/jc resetpos|r - Resetiraj poziciju prozora")
-        print("|cffffcc00/jc lock|r - Zaključaj prozor")
-        print("|cffffcc00/jc unlock|r - Otključaj prozor")
+        print("|cff00ff00JumpCounter:|r Unknown command. Type /jc help for commands.")
     end
 end
 
--- Spremi poziciju pri izlazu iz igre
+-- Spremi poziciju pri izlazu
 frame:RegisterEvent("PLAYER_LOGOUT")
 frame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGOUT" then
-        -- Spremi trenutnu poziciju
         local point, _, relativePoint, xOfs, yOfs = display:GetPoint(1)
         JumpCounterDB.point = point
         JumpCounterDB.x = xOfs
@@ -245,3 +285,36 @@ frame:SetScript("OnEvent", function(self, event)
         JumpCounterDB.width, JumpCounterDB.height = display:GetSize()
     end
 end)
+
+-- Force save periodically (svakih 30 sekundi)
+local saveTimer = 0
+frame:SetScript("OnUpdate", function(self, elapsed)
+    -- Poziv originalnog OnUpdate za jump detekciju
+    local isFalling = IsFalling()
+    if isFalling and not wasFalling then
+        local now = GetTime()
+        
+        if not JumpCounterDB.lastJumpTime or 
+           (now - JumpCounterDB.lastJumpTime) > SESSION_TIMEOUT then
+            JumpCounterDB.sessionCount = 1
+        else
+            JumpCounterDB.sessionCount = (JumpCounterDB.sessionCount or 0) + 1
+        end
+        
+        JumpCounterDB.count = JumpCounterDB.count + 1
+        JumpCounterDB.lastJumpTime = now
+        
+        UpdateText()
+    end
+    wasFalling = isFalling
+    
+    -- Periodicno spremanje
+    saveTimer = saveTimer + elapsed
+    if saveTimer > 30 then  -- Svakih 30 sekundi
+        saveTimer = 0
+        -- Force garbage collection može potaknuti spremanje
+        collectgarbage("collect")
+    end
+end)
+
+print("|cff00ff00JumpCounter|r loaded. Type |cffffcc00/jc|r for commands.")

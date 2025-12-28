@@ -1,31 +1,31 @@
 # JumpCounter - WoW Classic Addon
 
-A lightweight addon for World of Warcraft Classic that tracks and counts player jumps.
+A lightweight World of Warcraft Classic addon that tracks and counts your character's jumps in real-time. Perfect for jump enthusiasts, roleplayers, or anyone curious about their jumping habits!
 
-## Features
-- Real-time jump counting
-- Resizable and movable display window
-- Per-character data persistence
-- Slash command interface
-- WoW Classic 1.13.x compatible
+## ✨ Features
 
-## Installation
-1. Download the latest release
-2. Extract to: `World of Warcraft/_classic_/Interface/AddOns/JumpCounter/`
-3. Restart WoW or type `/reload`
+- **Real-time Jump Tracking**: Automatically detects and counts every jump
+- **Dual Counter System**: 
+  - **Total Jumps**: Lifetime counter (never resets)
+  - **Session Jumps**: Resets after 5 minutes of inactivity
+- **Smart UI**: Resizable and movable display window
+- **Jump Rate Calculation**: Shows jumps per minute during active sessions
+- **Per-Character Data**: Separate counters for each character
+- **Persistent Storage**: Saves data between game sessions
+- **Slash Commands**: Easy in-game control
 
-## Commands
-- `/jc` or `/jumpcount` - Display current jump count
-- `/jc reset` - Reset counter to zero
-- `/jc resetpos` - Reset window to default position
-- `/jc lock` - Lock window position
-- `/jc unlock` - Unlock window position
+## 📦 Installation
 
-## Preview
-![JumpCounter Interface](https://via.placeholder.com/400x200/333/fff?text=JumpCounter+Preview)
+1. **Download** the latest release from the [Releases](https://github.com/Jasamprobo/JumpCounter/releases) page
+2. **Extract** the `JumpCounter` folder to:
+World of Warcraft/classic/Interface/AddOns/
 
-## Development
-The addon is written in pure Lua and uses WoW Classic API.
+3. **Restart** WoW Classic or type `/reload` in-game
+4. The jump counter window will appear in the center of your screen
 
-## License
-MIT License
+## Contact
+Email: brodaracmartin@gmail.com
+
+"Not all who wander are lost, but all who jump are counted!" - Martin "Probo" Brodarac
+
+
